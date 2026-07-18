@@ -1,0 +1,26 @@
+{
+  "name": "@intelligencebiz/whatsapp-worker",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist",
+    "type-check": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@intelligencebiz/channel-core": "workspace:*",
+    "@intelligencebiz/database": "workspace:*",
+    "@intelligencebiz/shared": "workspace:*",
+    "@whiskeysockets/baileys": "6.7.23",
+    "bullmq": "^5.80.8",
+    "ioredis": "^5.11.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}
