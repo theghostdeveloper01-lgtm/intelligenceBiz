@@ -46,16 +46,29 @@ RUN pnpm turbo run build --filter=@intelligencebiz/web
 # .next/standalone bundles a minimal server.js + pruned node_modules; the
 # monorepo-relative path is preserved (apps/web/...), and static assets /
 # public/ aren't included by standalone output, so they're copied in too.
-FROM base AS runner
+#
+# This stage intentionally starts from a clean node:22-slim rather than
+# `base`: `base` runs `corepack enable`, which installs pnpm/yarn shims
+# into the image's PATH. Everything the app needs at runtime is already
+# in node_modules from the builder stage, so no package manager should
+# be reachable here at all — if anything ever tries to invoke `pnpm`
+# (e.g. a platform Start Command override), it should fail outright
+# instead of corepack silently trying to download/initialize pnpm and
+# writing to a cache dir it doesn't have permission for.
+FROM node:22-slim AS runner
 WORKDIR /app
-# --create-home: without it, /home/nodejs never exists, so anything
-# that invokes corepack (e.g. a platform Start Command override running
-# `pnpm` instead of this Dockerfile's `node` CMD) fails with EACCES
-# trying to mkdir its cache dir under a /home it can't write to.
-# COREPACK_ENABLE=0 belt-and-braces: even with a home dir, skip
-# corepack's package-manager shim entirely in the runtime image.
+# --create-home: without it, /home/nodejs never exists, and anything
+# that tries to write under $HOME (npm/corepack caches, etc.) fails
+# with EACCES. Belt-and-braces alongside removing the shims below.
 RUN groupadd --system --gid 1001 nodejs \
   && useradd --system --create-home --uid 1001 --gid nodejs nodejs
+# Fully disable corepack and delete its pnpm/yarn shims so there is no
+# package manager left in PATH — COREPACK_ENABLE=0 alone only stops
+# corepack from acting as npm's package-manager gatekeeper, it doesn't
+# remove the `pnpm`/`pnpx`/`yarn`/`yarnpkg` shim binaries themselves.
+RUN corepack disable \
+  && rm -f /usr/local/bin/corepack /usr/local/bin/pnpm /usr/local/bin/pnpx \
+    /usr/local/bin/yarn /usr/local/bin/yarnpkg
 ENV COREPACK_ENABLE=0
 COPY --from=builder --chown=nodejs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nodejs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
