@@ -82,6 +82,8 @@ export interface Database {
           session_updated_at: string | null;
           last_connected_at: string | null;
           last_disconnect_reason: string | null;
+          qr_data: string | null;
+          qr_expires_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -95,6 +97,8 @@ export interface Database {
           session_updated_at?: string | null;
           last_connected_at?: string | null;
           last_disconnect_reason?: string | null;
+          qr_data?: string | null;
+          qr_expires_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
