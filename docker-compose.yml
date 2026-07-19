@@ -1,0 +1,86 @@
+# Local dev / self-hosted deployment for the three long-running services.
+#
+# Supabase is NOT included here — use a hosted Supabase project, or run
+# `supabase start` (Supabase CLI) separately for local Postgres/Auth/
+# Storage/Realtime. Either way, point SUPABASE_URL at it below.
+#
+# Setup:
+#   1. cp apps/whatsapp-worker/.env.example apps/whatsapp-worker/.env
+#      cp apps/api/.env.example apps/api/.env
+#      cp apps/web/.env.example apps/web/.env
+#      ...then fill each in.
+#   2. Also create a root .env with NEXT_PUBLIC_SUPABASE_URL and
+#      NEXT_PUBLIC_SUPABASE_ANON_KEY — apps/web's Dockerfile needs them
+#      as build args (Next.js inlines NEXT_PUBLIC_* vars at build time,
+#      not runtime), and docker compose only substitutes ${...} in this
+#      file from a root .env, not from apps/web/.env.
+#   3. docker compose up --build
+#
+# REDIS_URL is overridden below to the compose network hostname
+# regardless of what each app's .env has, since "localhost" means
+# something different inside a container.
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  whatsapp-worker:
+    build:
+      context: .
+      dockerfile: apps/whatsapp-worker/Dockerfile
+    env_file:
+      - path: apps/whatsapp-worker/.env
+        required: false
+    environment:
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    env_file:
+      - path: apps/api/.env
+        required: false
+    environment:
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "3001:3000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    env_file:
+      - path: apps/web/.env
+        required: false
+    environment:
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "3000:3000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  redis-data:
